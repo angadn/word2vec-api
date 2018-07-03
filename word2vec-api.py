@@ -12,10 +12,12 @@ from gensim.models.word2vec import Word2Vec as w
 from gensim import utils, matutils
 from numpy import exp, dot, zeros, outer, random, dtype, get_include, float32 as REAL,\
      uint32, seterr, array, uint8, vstack, argsort, fromstring, sqrt, newaxis, ndarray, empty, sum as np_sum
+from gensim.corpora import Dictionary
 import cPickle
 import argparse
 import base64
 import sys
+import numpy as np
 
 parser = reqparse.RequestParser()
 
@@ -88,6 +90,21 @@ class ModelWordSet(Resource):
             print e
             return
 
+
+class DocToBOW(Resource):
+    def get(self):
+        parser = reqparse.RequestParser()
+        parser.add_argument('doc', type=str, required=True, help="doc to represent as Bag-of-words.")
+        args = parser.parse_args()
+        try:
+            res = np.array(dictionary.doc2bow(args['doc'].split(' ')))
+            res = base64.b64encode(res)
+            return res
+        except Exception, e:
+            print e
+            return
+
+
 app = Flask(__name__)
 api = Api(app)
 
@@ -101,6 +118,7 @@ def raiseError(error):
 
 if __name__ == '__main__':
     global model
+    global dictionary
 
     #----------- Parsing Arguments ---------------
     p = argparse.ArgumentParser()
@@ -119,9 +137,13 @@ if __name__ == '__main__':
     if not args.model:
         print "Usage: word2vec-apy.py --model path/to/the/model [--host host --port 1234]"
     model = w.load_word2vec_format(model_path, binary=binary)
+    d = [x.split(' ') for x in model.vocab.keys()]
+    print("len = {0}".format(len(d)))
+    dictionary = Dictionary(d)
     api.add_resource(N_Similarity, path+'/n_similarity')
     api.add_resource(Similarity, path+'/similarity')
     api.add_resource(MostSimilar, path+'/most_similar')
     api.add_resource(Model, path+'/model')
     api.add_resource(ModelWordSet, '/word2vec/model_word_set')
+    api.add_resource(DocToBOW, '/word2vec/doc2bow')
     app.run(host=host, port=port)
